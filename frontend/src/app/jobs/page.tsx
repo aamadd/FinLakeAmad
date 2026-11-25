@@ -37,61 +37,64 @@ export default function JobsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-white">Storage Ingestion Jobs</h1>
+      <div>
+        <h1 className="text-2xl font-bold text-zinc-900">Storage Jobs</h1>
+        <p className="text-sm text-zinc-500">Extraction asynchrone à mémoire bornée vers MinIO (`curated/` &amp; `manifests/`).</p>
+      </div>
 
-      <div className="p-4 rounded-lg border border-slate-800 bg-slate-900/70 flex flex-wrap gap-3 items-end">
+      <div className="p-5 rounded-xl border border-zinc-200 bg-white flex flex-wrap gap-3 items-end">
         <div>
-          <label className="block text-xs text-slate-400 mb-1">Source</label>
-          <select value={sourceId} onChange={(e) => setSourceId(e.target.value)} className="bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-sm">
+          <label className="block text-xs font-medium text-zinc-600 mb-1">Source</label>
+          <select value={sourceId} onChange={(e) => setSourceId(e.target.value)} className="border border-zinc-200 rounded-lg px-3 py-2 text-sm bg-white">
             <option value="amad-mssql">amad-mssql (SQL Server)</option>
             <option value="amad-postgres">amad-postgres (PostgreSQL)</option>
           </select>
         </div>
         <div>
-          <label className="block text-xs text-slate-400 mb-1">Format</label>
-          <select value={format} onChange={(e) => setFormat(e.target.value)} className="bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-sm">
+          <label className="block text-xs font-medium text-zinc-600 mb-1">Format</label>
+          <select value={format} onChange={(e) => setFormat(e.target.value)} className="border border-zinc-200 rounded-lg px-3 py-2 text-sm bg-white">
             <option value="PARQUET">PARQUET</option>
             <option value="CSV">CSV</option>
           </select>
         </div>
         <div>
-          <label className="block text-xs text-slate-400 mb-1">Compression</label>
-          <select value={compression} onChange={(e) => setCompression(e.target.value)} className="bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-sm">
+          <label className="block text-xs font-medium text-zinc-600 mb-1">Compression</label>
+          <select value={compression} onChange={(e) => setCompression(e.target.value)} className="border border-zinc-200 rounded-lg px-3 py-2 text-sm bg-white">
             <option value="ZSTD">ZSTD</option>
             <option value="SNAPPY">SNAPPY</option>
             <option value="NONE">NONE</option>
           </select>
         </div>
         <div>
-          <label className="block text-xs text-slate-400 mb-1">Max Rows (0 = full)</label>
-          <input type="number" value={maxRows} onChange={(e) => setMaxRows(Number(e.target.value))} className="w-32 bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-sm" />
+          <label className="block text-xs font-medium text-zinc-600 mb-1">Max Rows (0 = full)</label>
+          <input type="number" value={maxRows} onChange={(e) => setMaxRows(Number(e.target.value))} className="w-36 border border-zinc-200 rounded-lg px-3 py-2 text-sm" />
         </div>
-        <button onClick={submit} className="px-4 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-sm font-medium text-white">
-          Launch Job
+        <button onClick={submit} className="px-4 py-2 rounded-lg bg-[#18181b] hover:bg-zinc-800 text-sm font-medium text-white">
+          Lancer un job
         </button>
       </div>
 
-      <div className="rounded-lg border border-slate-800 bg-slate-900/70 overflow-x-auto">
+      <div className="rounded-xl border border-zinc-200 bg-white overflow-x-auto">
         <table className="w-full text-xs text-left">
-          <thead className="text-slate-400 border-b border-slate-800">
+          <thead className="bg-zinc-50 text-zinc-500 border-b border-zinc-200">
             <tr>
-              <th className="p-3">Job ID</th><th>Status</th><th>Rows</th><th>Files</th><th>Bytes</th><th>Actions</th>
+              <th className="p-3">Job ID</th><th>Statut</th><th>Lignes</th><th>Fichiers</th><th>Octets</th><th>Actions</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-zinc-100">
             {jobs.map((j) => (
-              <tr key={j.jobId} className="border-b border-slate-800/60">
-                <td className="p-3 font-mono text-slate-300">{j.jobId}</td>
-                <td className="font-semibold">{j.status}</td>
+              <tr key={j.jobId}>
+                <td className="p-3 font-mono text-zinc-700">{j.jobId}</td>
+                <td className="font-semibold text-zinc-900">{j.status}</td>
                 <td>{j.rowsProcessed.toLocaleString()}</td>
                 <td>{j.filesWritten}</td>
                 <td>{j.bytesWritten.toLocaleString()}</td>
                 <td className="space-x-2">
                   {(j.status === "FAILED" || j.status === "SUCCEEDED" || j.status === "CANCELLED") && (
-                    <button onClick={() => amadApi.retryJob(j.jobId).then(load)} className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700">Retry</button>
+                    <button onClick={() => amadApi.retryJob(j.jobId).then(load)} className="px-2.5 py-1 rounded border border-zinc-200 hover:bg-zinc-50">Relancer</button>
                   )}
                   {(j.status === "PENDING" || j.status === "RUNNING") && (
-                    <button onClick={() => amadApi.cancelJob(j.jobId).then(load)} className="px-2 py-0.5 rounded bg-rose-800 hover:bg-rose-700">Cancel</button>
+                    <button onClick={() => amadApi.cancelJob(j.jobId).then(load)} className="px-2.5 py-1 rounded bg-rose-600 text-white hover:bg-rose-500">Annuler</button>
                   )}
                 </td>
               </tr>

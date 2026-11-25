@@ -38,11 +38,11 @@ export default function AnalyticsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Trino SQL Analytics</h1>
-          <div className="text-xs text-slate-400">Registered tables in finlake_curated: {tables.join(", ") || "none"}</div>
+          <h1 className="text-2xl font-bold text-zinc-900">Trino Analytics</h1>
+          <div className="text-xs text-zinc-500">Tables enregistrées (`finlake_curated`): {tables.join(", ") || "aucune"}</div>
         </div>
-        <button onClick={syncTable} className="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-xs">
-          Sync Hive Partitions
+        <button onClick={syncTable} className="px-3 py-1.5 rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50 text-xs font-medium text-zinc-700">
+          Synchroniser Hive Partitions
         </button>
       </div>
 
@@ -50,27 +50,27 @@ export default function AnalyticsPage() {
         value={sql}
         onChange={(e) => setSql(e.target.value)}
         rows={5}
-        className="w-full p-3 rounded-lg bg-slate-950 border border-slate-800 font-mono text-sm text-emerald-200"
+        className="w-full p-3 rounded-xl bg-white border border-zinc-200 font-mono text-sm text-zinc-900"
       />
-      <button onClick={run} className="px-4 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-sm font-medium text-white">
-        Run Query
+      <button onClick={run} className="px-4 py-2 rounded-lg bg-[#18181b] hover:bg-zinc-800 text-sm font-medium text-white">
+        Exécuter SQL
       </button>
 
-      {err && <div className="p-3 rounded border border-rose-500/40 bg-rose-950/40 text-rose-200 text-xs">{err}</div>}
+      {err && <div className="p-3 rounded-lg border border-rose-200 bg-rose-50 text-rose-700 text-xs">{err}</div>}
 
       {result && (
-        <div className="rounded-lg border border-slate-800 bg-slate-900/70 overflow-x-auto">
-          <div className="px-3 py-2 text-xs text-slate-400 border-b border-slate-800">
-            {result.rowCount} rows · {result.durationMs} ms
+        <div className="rounded-xl border border-zinc-200 bg-white overflow-x-auto">
+          <div className="px-4 py-2.5 text-xs text-zinc-500 border-b border-zinc-200 bg-zinc-50">
+            {result.rowCount} lignes · {result.durationMs} ms
           </div>
           <table className="w-full text-xs text-left">
-            <thead className="text-slate-400 border-b border-slate-800">
-              <tr>{result.columns.map((c) => <th key={c} className="p-2">{c}</th>)}</tr>
+            <thead className="text-zinc-500 border-b border-zinc-200">
+              <tr>{result.columns.map((c) => <th key={c} className="p-2.5">{c}</th>)}</tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-zinc-100">
               {result.rows.map((r, idx) => (
-                <tr key={idx} className="border-b border-slate-800/50">
-                  {result.columns.map((c) => <td key={c} className="p-2 font-mono">{String(r[c] ?? "")}</td>)}
+                <tr key={idx}>
+                  {result.columns.map((c) => <td key={c} className="p-2.5 font-mono text-zinc-800">{String(r[c] ?? "")}</td>)}
                 </tr>
               ))}
             </tbody>
