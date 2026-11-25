@@ -1,0 +1,31 @@
+server:
+  port: ${AMAD_API_PORT:8000}
+
+spring:
+  application:
+    name: amad-control-plane
+
+springdoc:
+  swagger-ui:
+    path: /docs
+  api-docs:
+    path: /openapi.json
+
+amad:
+  mssql:
+    host: ${AMAD_MSSQL_HOST:amad-mssql}
+    port: ${AMAD_MSSQL_INTERNAL_PORT:1433}
+    database: ${AMAD_MSSQL_DB:amad_source}
+    username: ${AMAD_MSSQL_USER:sa}
+    password: ${AMAD_MSSQL_SA_PASSWORD:}
+  postgres:
+    host: ${AMAD_PG_HOST:amad-postgres}
+    port: ${AMAD_PG_INTERNAL_PORT:5432}
+    database: ${AMAD_PG_DB:amad_source}
+    username: ${AMAD_PG_USER:amad_source}
+    password: ${AMAD_PG_PASSWORD:}
+  minio:
+    endpoint: ${AMAD_MINIO_ENDPOINT:http://amad-minio:9000}
+    bucket: ${AMAD_LAKE_BUCKET:amad-lake}
+  trino:
+    endpoint: ${AMAD_TRINO_ENDPOINT:http://amad-trino:8080}

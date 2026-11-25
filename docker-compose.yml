@@ -147,6 +147,36 @@ services:
       amad-metastore: { condition: service_healthy }
       amad-minio: { condition: service_healthy }
 
+  # 7. Spring Boot 3 Control Plane (Java 21)
+  amad-control-plane:
+    <<: *amad-defaults
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    image: finlake-amad/control-plane:0.2.0
+    container_name: amad-control-plane
+    ports: ["${AMAD_API_PORT:-8000}:8000"]
+    environment:
+      AMAD_API_PORT: "8000"
+      AMAD_MSSQL_HOST: amad-mssql
+      AMAD_MSSQL_INTERNAL_PORT: "1433"
+      AMAD_MSSQL_DB: amad_source
+      AMAD_MSSQL_USER: sa
+      AMAD_MSSQL_SA_PASSWORD: ${AMAD_MSSQL_SA_PASSWORD:?set in .env}
+      AMAD_PG_HOST: amad-postgres
+      AMAD_PG_INTERNAL_PORT: "5432"
+      AMAD_PG_DB: ${AMAD_PG_DB}
+      AMAD_PG_USER: ${AMAD_PG_USER}
+      AMAD_PG_PASSWORD: ${AMAD_PG_PASSWORD:?set in .env}
+      AMAD_MINIO_ENDPOINT: http://amad-minio:9000
+      AMAD_LAKE_BUCKET: ${AMAD_LAKE_BUCKET:-amad-lake}
+      AMAD_TRINO_ENDPOINT: http://amad-trino:8080
+    depends_on:
+      amad-mssql: { condition: service_healthy }
+      amad-postgres: { condition: service_healthy }
+      amad-minio: { condition: service_healthy }
+      amad-trino: { condition: service_healthy }
+
 networks:
   amad-net:
     name: finlake-amad-net
