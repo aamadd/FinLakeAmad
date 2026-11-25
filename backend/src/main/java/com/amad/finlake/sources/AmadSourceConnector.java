@@ -4,6 +4,8 @@ import com.amad.finlake.sources.ProbeModels.ColumnSchema;
 import com.amad.finlake.sources.ProbeModels.SourceProbeResponse;
 import com.amad.finlake.sources.ProbeModels.TableSummary;
 
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.util.List;
 
 /** SOLID contract implemented once per relational engine (SQL Server, PostgreSQL, ...). */
@@ -16,6 +18,8 @@ public interface AmadSourceConnector {
     String buildJdbcUrl(SourceConfig config);
 
     String quoteIdentifier(String validatedIdentifier);
+
+    Connection openJdbcConnection(SourceConfig config) throws SQLException;
 
     SourceProbeResponse probe(SourceConfig config);
 
