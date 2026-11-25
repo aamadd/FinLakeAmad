@@ -15,7 +15,7 @@ export interface SourceSummary {
   host: string;
   port: number;
   database: string;
-  status: string;
+  status: "CONNECTED" | "FAILED" | "UNTESTED" | string;
   serverVersion: string | null;
   lastTestedAt: string | null;
   lastError: string | null;
@@ -24,17 +24,24 @@ export interface SourceSummary {
 export interface ProbeStep {
   step: number;
   name: string;
-  status: string;
+  status: "PASSED" | "FAILED" | string;
   durationMs: number;
   detail: string;
 }
 
+export interface TableSummary {
+  schema: string;
+  name: string;
+  type: string;
+  estimatedRows: number;
+}
+
 export interface ProbeResponse {
   connected: boolean;
-  engine: string;
+  engine: "MSSQL" | "POSTGRES";
   serverVersion: string | null;
   steps: ProbeStep[];
-  tables: { schema: string; name: string; type: string; estimatedRows: number }[];
+  tables: TableSummary[];
   errorHint: string | null;
 }
 
@@ -81,7 +88,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export const amadApi = {
   health: () => request<HealthResponse>("/health"),
   sources: () => request<SourceSummary[]>("/sources"),
+  createSource: (body: Record<string, unknown>) =>
+    request<SourceSummary>("/sources", { method: "POST", body: JSON.stringify(body) }),
+  probeSource: (body: Record<string, unknown>, signal?: AbortSignal) =>
+    request<ProbeResponse>("/sources/probe", { method: "POST", body: JSON.stringify(body), signal }),
   testSource: (id: string) => request<ProbeResponse>(`/sources/${id}/test`, { method: "POST" }),
+  listTables: (id: string) => request<TableSummary[]>(`/sources/${id}/tables`),
   tableSchema: (id: string, schema: string, table: string) =>
     request<{ columns: ColumnSchema[] }>(`/sources/${id}/tables/${table}/schema?schema=${encodeURIComponent(schema)}`),
   jobs: () => request<JobRecord[]>("/storage/jobs?limit=30"),
