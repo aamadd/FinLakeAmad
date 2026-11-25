@@ -31,7 +31,7 @@ public class DuckDbBatchExporter {
                 isFraud BOOLEAN,
                 isFlaggedFraud BOOLEAN,
                 event_time_simulated TIMESTAMP,
-                event_date DATE
+                event_date VARCHAR
             )
             """;
 
@@ -59,7 +59,7 @@ public class DuckDbBatchExporter {
                     ps.setBoolean(11, r.isFraud());
                     ps.setBoolean(12, r.isFlaggedFraud());
                     ps.setTimestamp(13, Timestamp.from(r.eventTimeSimulated()));
-                    ps.setDate(14, Date.valueOf(r.eventDate()));
+                    ps.setString(14, r.eventDate().toString());
                     ps.addBatch();
                 }
                 ps.executeBatch();

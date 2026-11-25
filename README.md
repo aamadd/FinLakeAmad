@@ -17,7 +17,7 @@ PaySim CSV -> SQL Server / PostgreSQL -> amad-control-plane (Spring Boot 3.3.5, 
 | 3 | Ingestion engine: keyset batches, CSV/Parquet, staging -> curated, manifests | done |
 | 4 | Catalog registration + Trino queries | done |
 | 5 | Jobs API (`/storage/jobs`), states, retry, cancel | done |
-| 6 | Benchmarks + report | planned |
+| 6 | Benchmarks + report | done |
 | 7 | `amad-console` UI (optional per cahier §2.2) | planned |
 
 ## Quick start (Phase 0)
