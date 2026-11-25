@@ -180,6 +180,18 @@ services:
       amad-minio: { condition: service_healthy }
       amad-trino: { condition: service_healthy }
 
+  # 8. Next.js 15 Console UI
+  amad-console:
+    <<: *amad-defaults
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    image: finlake-amad/console:0.1.0
+    container_name: amad-console
+    ports: ["${AMAD_UI_PORT:-3000}:3000"]
+    depends_on:
+      amad-control-plane: { condition: service_healthy }
+
 networks:
   amad-net:
     name: finlake-amad-net
