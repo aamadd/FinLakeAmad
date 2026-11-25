@@ -2,103 +2,117 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, BarChart3, Box, Database, ExternalLink, Layers } from "lucide-react";
+import { Activity, BarChart3, Box, ChevronDown, Database, Layers, ListTree } from "lucide-react";
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
-import { amadApi } from "@/lib/amadApi";
 
-const PRIMARY_NAV = [
+const NAV_ITEMS = [
   { name: "Data Sources", href: "/sources", icon: Database },
+  { name: "Source Explorer", href: "/sources?explorer=1", icon: ListTree },
+  { name: "Storage", href: "http://localhost:9101", icon: Box, external: true },
   { name: "Storage Jobs", href: "/jobs", icon: Activity },
-  { name: "Trino Analytics", href: "/analytics", icon: BarChart3 },
-  { name: "Platform Health", href: "/", icon: Layers },
 ];
 
 export function AmadShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const [status, setStatus] = useState<"UP" | "DEGRADED" | "CHECKING">("CHECKING");
-
-  useEffect(() => {
-    amadApi
-      .health()
-      .then((h) => setStatus(h.status === "UP" ? "UP" : "DEGRADED"))
-      .catch(() => setStatus("DEGRADED"));
-  }, [pathname]);
 
   const breadcrumb = () => {
     if (pathname === "/sources/new") {
       return (
-        <div className="flex items-center gap-2 text-sm text-zinc-600">
-          <Link href="/sources" className="hover:text-zinc-900">Data Sources</Link>
-          <span className="text-zinc-400">›</span>
-          <span className="font-medium text-zinc-900">Ajouter une connexion</span>
+        <div className="flex items-center gap-2 text-xs text-neutral-500">
+          <Link href="/sources" className="hover:text-neutral-900">Data Sources</Link>
+          <span>›</span>
+          <span className="font-semibold text-neutral-900">Ajouter une connexion SQL Server</span>
         </div>
       );
     }
-    const match = PRIMARY_NAV.find((n) => n.href === pathname);
-    return <span className="text-sm font-medium text-zinc-900">{match?.name ?? "Data Platform"}</span>;
+    if (pathname === "/sources") {
+      return <span className="text-xs font-semibold text-neutral-900">Data Sources</span>;
+    }
+    if (pathname === "/jobs") {
+      return <span className="text-xs font-semibold text-neutral-900">Storage Jobs</span>;
+    }
+    if (pathname === "/analytics") {
+      return <span className="text-xs font-semibold text-neutral-900">Trino Analytics</span>;
+    }
+    return <span className="text-xs font-semibold text-neutral-900">Data Platform</span>;
   };
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa] flex font-sans text-zinc-900">
-      <aside className="w-60 bg-white border-r border-zinc-200 flex flex-col fixed inset-y-0 left-0 z-30">
-        <div className="h-16 flex items-center gap-3 px-6 border-b border-zinc-100">
-          <div className="h-8 w-8 bg-[#18181b] rounded-lg flex items-center justify-center text-white">
+    <div className="min-h-screen bg-white flex font-sans text-neutral-900">
+      {/* Wireframe Left Sidebar (#f5f5f5) */}
+      <aside className="w-56 bg-[#f5f5f5] border-r border-neutral-200 flex flex-col fixed inset-y-0 left-0 z-30">
+        <div className="h-14 flex items-center gap-2.5 px-4">
+          <div className="h-7 w-7 bg-[#27272a] rounded-md flex items-center justify-center text-white">
             <Layers className="h-4 w-4" />
           </div>
-          <div>
-            <div className="font-bold text-sm tracking-tight text-zinc-900">Data Platform</div>
-            <div className="text-[11px] text-zinc-400">FinLakeAmad</div>
-          </div>
+          <span className="font-bold text-sm tracking-tight text-neutral-900">Data Platform</span>
         </div>
 
-        <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
-          {PRIMARY_NAV.map(({ name, href, icon: Icon }) => {
-            const active = pathname === href || (href === "/sources" && pathname.startsWith("/sources"));
+        <nav className="flex-1 py-2 px-3 space-y-1">
+          {NAV_ITEMS.map(({ name, href, icon: Icon, external }) => {
+            const active =
+              !external &&
+              ((href === "/sources" && pathname.startsWith("/sources")) || pathname === href);
+            if (external) {
+              return (
+                <a
+                  key={name}
+                  href={href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-medium text-neutral-600 hover:text-neutral-900 hover:bg-neutral-200/60"
+                >
+                  <Icon className="h-4 w-4 text-neutral-500" />
+                  <span>{name}</span>
+                </a>
+              );
+            }
             return (
               <Link
-                key={href}
+                key={name}
                 href={href}
-                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all ${
+                className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-xs transition ${
                   active
-                    ? "bg-white border border-zinc-200 text-zinc-900 shadow-sm font-semibold"
-                    : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100/80 font-medium"
+                    ? "bg-white border border-neutral-300 text-neutral-900 font-semibold shadow-2xs"
+                    : "text-neutral-600 hover:text-neutral-900 hover:bg-neutral-200/60 font-medium"
                 }`}
               >
-                <Icon className={`h-4 w-4 ${active ? "text-zinc-900" : "text-zinc-500"}`} />
+                <Icon className={`h-4 w-4 ${active ? "text-neutral-900" : "text-neutral-500"}`} />
                 <span>{name}</span>
               </Link>
             );
           })}
 
-          <div className="pt-6 pb-2 px-3">
-            <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Infrastructure</p>
+          <div className="pt-5 pb-1 px-3">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400">FinLakeAmad</div>
           </div>
-          <a
-            href="http://localhost:9101"
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100/80"
+          <Link
+            href="/analytics"
+            className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-xs ${
+              pathname === "/analytics"
+                ? "bg-white border border-neutral-300 text-neutral-900 font-semibold"
+                : "text-neutral-600 hover:text-neutral-900 hover:bg-neutral-200/60 font-medium"
+            }`}
           >
-            <span className="flex items-center gap-3"><Box className="h-4 w-4 text-zinc-500" />MinIO Storage</span>
-            <ExternalLink className="h-3 w-3 text-zinc-400" />
-          </a>
+            <BarChart3 className="h-4 w-4 text-neutral-500" />
+            <span>Trino Analytics</span>
+          </Link>
         </nav>
       </aside>
 
-      <div className="flex-1 ml-60 flex flex-col min-w-0">
-        <header className="h-16 bg-white border-b border-zinc-200 px-8 flex items-center justify-between sticky top-0 z-20">
+      {/* Main White Workspace */}
+      <div className="flex-1 ml-56 flex flex-col min-w-0 bg-white">
+        <header className="h-14 bg-white border-b border-neutral-200 px-8 flex items-center justify-between sticky top-0 z-20">
           {breadcrumb()}
-          <div className="flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium border border-zinc-200 bg-zinc-50">
-            <span
-              className={`h-2 w-2 rounded-full ${
-                status === "UP" ? "bg-emerald-500" : status === "CHECKING" ? "bg-amber-500" : "bg-rose-500"
-              }`}
-            />
-            <span className="text-zinc-700">{status === "UP" ? "Services Online" : status === "CHECKING" ? "Checking..." : "Degraded"}</span>
+          <div className="flex items-center gap-2 text-xs text-neutral-700">
+            <span className="h-7 w-7 rounded-full bg-neutral-200 text-neutral-700 font-semibold flex items-center justify-center text-[11px]">
+              AK
+            </span>
+            <span className="font-medium">Amad Platform</span>
+            <ChevronDown className="h-3.5 w-3.5 text-neutral-400" />
           </div>
         </header>
-        <main className="flex-1 p-8 max-w-6xl w-full mx-auto">{children}</main>
+        <main className="flex-1 px-8 py-7 max-w-6xl w-full">{children}</main>
       </div>
     </div>
   );
