@@ -1,0 +1,28 @@
+# Secrets
+.env
+*.env.local
+
+# Data (large / generated)
+data/raw/*
+!data/raw/.gitkeep
+benchmarks/results/*
+!benchmarks/results/.gitkeep
+
+# Java
+target/
+*.class
+*.jar
+!infra/**/*.jar.sha256
+
+# Node
+node_modules/
+.next/
+out/
+
+# IDE / OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+*.log

@@ -1,0 +1,158 @@
+# FinLakeAmad — local stack (Phase 0: infrastructure only).
+# Backend (amad-control-plane) and UI (amad-console) are added in later phases.
+# All credentials come from `.env` (see `.env.example`).
+
+name: finlake-amad
+
+x-amad-defaults: &amad-defaults
+  networks: [amad-net]
+  restart: unless-stopped
+
+services:
+  # 1. Primary relational source (PaySim lands here)
+  amad-mssql:
+    <<: *amad-defaults
+    image: mcr.microsoft.com/mssql/server:2022-CU16-ubuntu-22.04
+    container_name: amad-mssql
+    ports: ["${AMAD_MSSQL_PORT:-1433}:1433"]
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${AMAD_MSSQL_SA_PASSWORD:?set in .env}
+      MSSQL_MEMORY_LIMIT_MB: "2048"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$${MSSQL_SA_PASSWORD}\" -C -Q \"SELECT 1\" -b -o /dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    volumes: [amad-mssql-data:/var/opt/mssql]
+
+  # 2. Secondary relational source
+  amad-postgres:
+    <<: *amad-defaults
+    image: postgres:16.4-alpine
+    container_name: amad-postgres
+    ports: ["${AMAD_PG_PORT:-5435}:5432"]
+    environment:
+      POSTGRES_USER: ${AMAD_PG_USER:?set in .env}
+      POSTGRES_PASSWORD: ${AMAD_PG_PASSWORD:?set in .env}
+      POSTGRES_DB: ${AMAD_PG_DB:?set in .env}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes: [amad-postgres-data:/var/lib/postgresql/data]
+
+  # 3. S3-compatible object storage
+  amad-minio:
+    <<: *amad-defaults
+    image: alpine/minio:RELEASE.2025-10-15T17-29-55Z
+    container_name: amad-minio
+    user: "0:0"
+    command: server /data --console-address ":9001"
+    ports:
+      - "${AMAD_MINIO_API_PORT:-9100}:9000"
+      - "${AMAD_MINIO_CONSOLE_PORT:-9101}:9001"
+    environment:
+      MINIO_ROOT_USER: ${AMAD_MINIO_ROOT_USER:?set in .env}
+      MINIO_ROOT_PASSWORD: ${AMAD_MINIO_ROOT_PASSWORD:?set in .env}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:9000/minio/health/live || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    volumes: [amad-minio-data:/data]
+
+  # 3b. One-shot bucket bootstrap (AWS CLI against the S3 API; image ships no `mc`)
+  amad-minio-init:
+    image: amazon/aws-cli:2.17.0
+    container_name: amad-minio-init
+    networks: [amad-net]
+    restart: "no"
+    depends_on:
+      amad-minio: { condition: service_healthy }
+    environment:
+      AWS_ACCESS_KEY_ID: ${AMAD_MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${AMAD_MINIO_ROOT_PASSWORD}
+      AWS_DEFAULT_REGION: us-east-1
+      AMAD_LAKE_BUCKET: ${AMAD_LAKE_BUCKET:-amad-lake}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        aws --endpoint-url http://amad-minio:9000 s3api head-bucket --bucket "$$AMAD_LAKE_BUCKET" 2>/dev/null ||
+        aws --endpoint-url http://amad-minio:9000 s3 mb "s3://$$AMAD_LAKE_BUCKET" &&
+        echo "bucket $$AMAD_LAKE_BUCKET ready"
+
+  # 4. Hive Metastore backing database
+  amad-metastore-db:
+    <<: *amad-defaults
+    image: postgres:16.4-alpine
+    container_name: amad-metastore-db
+    ports: ["${AMAD_METASTORE_DB_PORT:-5436}:5432"]
+    environment:
+      POSTGRES_USER: ${AMAD_METASTORE_DB_USER:?set in .env}
+      POSTGRES_PASSWORD: ${AMAD_METASTORE_DB_PASSWORD:?set in .env}
+      POSTGRES_DB: ${AMAD_METASTORE_DB_NAME:?set in .env}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes: [amad-metastore-db-data:/var/lib/postgresql/data]
+
+  # 5. Hive Metastore (catalog for external Parquet/CSV tables)
+  amad-metastore:
+    <<: *amad-defaults
+    build: ./infra/hive-metastore
+    image: finlake-amad/metastore:4.0.0
+    container_name: amad-metastore
+    ports: ["${AMAD_METASTORE_PORT:-9083}:9083"]
+    environment:
+      SERVICE_NAME: metastore
+      DB_DRIVER: postgres
+      AMAD_METASTORE_DB_USER: ${AMAD_METASTORE_DB_USER}
+      AMAD_METASTORE_DB_PASSWORD: ${AMAD_METASTORE_DB_PASSWORD}
+      AMAD_METASTORE_DB_NAME: ${AMAD_METASTORE_DB_NAME}
+      AMAD_MINIO_ROOT_USER: ${AMAD_MINIO_ROOT_USER}
+      AMAD_MINIO_ROOT_PASSWORD: ${AMAD_MINIO_ROOT_PASSWORD}
+      AMAD_LAKE_BUCKET: ${AMAD_LAKE_BUCKET:-amad-lake}
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/9083' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    depends_on:
+      amad-metastore-db: { condition: service_healthy }
+      amad-minio-init: { condition: service_completed_successfully }
+
+  # 6. Trino SQL engine
+  amad-trino:
+    <<: *amad-defaults
+    image: trinodb/trino:452
+    container_name: amad-trino
+    ports: ["${AMAD_TRINO_PORT:-8088}:8080"]
+    environment:
+      AMAD_MINIO_ROOT_USER: ${AMAD_MINIO_ROOT_USER}
+      AMAD_MINIO_ROOT_PASSWORD: ${AMAD_MINIO_ROOT_PASSWORD}
+    volumes: ["./infra/trino/catalog:/etc/trino/catalog:ro"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/v1/info | grep -q '\"starting\":false'"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+    depends_on:
+      amad-metastore: { condition: service_healthy }
+      amad-minio: { condition: service_healthy }
+
+networks:
+  amad-net:
+    name: finlake-amad-net
+
+volumes:
+  amad-mssql-data:
+  amad-postgres-data:
+  amad-minio-data:
+  amad-metastore-db-data:
