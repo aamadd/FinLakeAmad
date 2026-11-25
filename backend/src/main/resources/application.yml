@@ -12,6 +12,7 @@ springdoc:
     path: /openapi.json
 
 amad:
+  simulation-epoch: ${AMAD_SIMULATION_EPOCH:2026-01-01T00:00:00Z}
   mssql:
     host: ${AMAD_MSSQL_HOST:amad-mssql}
     port: ${AMAD_MSSQL_INTERNAL_PORT:1433}
@@ -26,6 +27,8 @@ amad:
     password: ${AMAD_PG_PASSWORD:}
   minio:
     endpoint: ${AMAD_MINIO_ENDPOINT:http://amad-minio:9000}
+    access-key: ${AMAD_MINIO_ROOT_USER:}
+    secret-key: ${AMAD_MINIO_ROOT_PASSWORD:}
     bucket: ${AMAD_LAKE_BUCKET:amad-lake}
   trino:
     endpoint: ${AMAD_TRINO_ENDPOINT:http://amad-trino:8080}

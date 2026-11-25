@@ -6,10 +6,11 @@ RUN mvn -B dependency:go-offline
 COPY backend/src ./src
 RUN mvn -B test package
 
-FROM eclipse-temurin:21-jre-alpine
+# glibc-based JRE so DuckDB JNI native library loads cleanly
+FROM eclipse-temurin:21-jre
 WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar
 EXPOSE 8000
 HEALTHCHECK --interval=10s --timeout=5s --retries=10 --start-period=25s \
-  CMD wget -q -O - http://localhost:8000/health | grep -q '"service":"amad-control-plane"' || exit 1
+  CMD bash -c '</dev/tcp/localhost/8000' || exit 1
 ENTRYPOINT ["java", "-jar", "app.jar"]

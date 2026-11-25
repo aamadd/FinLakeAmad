@@ -90,6 +90,11 @@ public abstract class AbstractJdbcSourceConnector implements AmadSourceConnector
         return cols;
     }
 
+    @Override
+    public Connection openJdbcConnection(SourceConfig config) throws SQLException {
+        return openConnection(config);
+    }
+
     protected Connection openConnection(SourceConfig config) throws SQLException {
         Properties props = new Properties();
         props.setProperty("user", config.username());

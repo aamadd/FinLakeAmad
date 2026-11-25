@@ -83,6 +83,14 @@ public class SourceRegistryService {
         return new TableSchemaResponse(id, effectiveSchema, table, cols);
     }
 
+    public SourceConfig getConfig(String id) {
+        return find(id).config;
+    }
+
+    public AmadSourceConnector getConnector(SourceEngine engine) {
+        return connectorFor(engine);
+    }
+
     private RegisteredSource find(String id) {
         RegisteredSource src = registry.get(id);
         if (src == null) {
