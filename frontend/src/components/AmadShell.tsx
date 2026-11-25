@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, BarChart3, Box, ChevronDown, Database, Layers, ListTree } from "lucide-react";
+import { Activity, Box, ChevronDown, Database, Layers, ListTree } from "lucide-react";
 import type { ReactNode } from "react";
 
 const NAV_ITEMS = [
   { name: "Data Sources", href: "/sources", icon: Database },
-  { name: "Source Explorer", href: "/sources?explorer=1", icon: ListTree },
+  { name: "Source Explorer", href: "/explorer", icon: ListTree },
   { name: "Storage", href: "http://localhost:9101", icon: Box, external: true },
   { name: "Storage Jobs", href: "/jobs", icon: Activity },
 ];
@@ -25,21 +25,21 @@ export function AmadShell({ children }: { children: ReactNode }) {
         </div>
       );
     }
+    if (pathname === "/explorer") {
+      return <span className="text-xs font-semibold text-neutral-900">Source Explorer</span>;
+    }
     if (pathname === "/sources") {
       return <span className="text-xs font-semibold text-neutral-900">Data Sources</span>;
     }
     if (pathname === "/jobs") {
       return <span className="text-xs font-semibold text-neutral-900">Storage Jobs</span>;
     }
-    if (pathname === "/analytics") {
-      return <span className="text-xs font-semibold text-neutral-900">Trino Analytics</span>;
-    }
     return <span className="text-xs font-semibold text-neutral-900">Data Platform</span>;
   };
 
   return (
     <div className="min-h-screen bg-white flex font-sans text-neutral-900">
-      {/* Wireframe Left Sidebar (#f5f5f5) */}
+      {/* Wireframe Left Sidebar (#f5f5f5) — exact 4 items */}
       <aside className="w-56 bg-[#f5f5f5] border-r border-neutral-200 flex flex-col fixed inset-y-0 left-0 z-30">
         <div className="h-14 flex items-center gap-2.5 px-4">
           <div className="h-7 w-7 bg-[#27272a] rounded-md flex items-center justify-center text-white">
@@ -82,21 +82,6 @@ export function AmadShell({ children }: { children: ReactNode }) {
               </Link>
             );
           })}
-
-          <div className="pt-5 pb-1 px-3">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400">FinLakeAmad</div>
-          </div>
-          <Link
-            href="/analytics"
-            className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-xs ${
-              pathname === "/analytics"
-                ? "bg-white border border-neutral-300 text-neutral-900 font-semibold"
-                : "text-neutral-600 hover:text-neutral-900 hover:bg-neutral-200/60 font-medium"
-            }`}
-          >
-            <BarChart3 className="h-4 w-4 text-neutral-500" />
-            <span>Trino Analytics</span>
-          </Link>
         </nav>
       </aside>
 
