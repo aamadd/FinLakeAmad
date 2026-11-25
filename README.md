@@ -12,7 +12,7 @@ PaySim CSV -> SQL Server / PostgreSQL -> amad-control-plane (Spring Boot 3.3.5, 
 | Phase | Scope | State |
 |---|---|---|
 | 0 | Repo skeleton, infrastructure stack (SQL Server, PostgreSQL, MinIO, Hive Metastore, Trino) | done |
-| 1 | PaySim download, checksum, import into SQL Server + PostgreSQL (`ingest_row_id`) | planned |
+| 1 | PaySim download, checksum, import into SQL Server + PostgreSQL (`ingest_row_id`) | done |
 | 2 | `amad-control-plane`: sources, connection test, schema exploration | planned |
 | 3 | Ingestion engine: keyset batches, CSV/Parquet, staging -> curated, manifests | planned |
 | 4 | Catalog registration + Trino queries | planned |
