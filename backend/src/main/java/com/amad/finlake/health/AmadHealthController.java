@@ -26,6 +26,20 @@ public class AmadHealthController {
         this.props = props;
     }
 
+    @GetMapping("/")
+    public Map<String, Object> root() {
+        return Map.of(
+                "service", "amad-control-plane",
+                "status", "UP",
+                "docs", "/docs",
+                "openapi", "/openapi.json",
+                "health", "/health",
+                "sources", "/sources",
+                "jobs", "/storage/jobs",
+                "catalog", "/catalog/tables"
+        );
+    }
+
     @GetMapping("/health")
     public Map<String, Object> health() {
         Map<String, String> components = new LinkedHashMap<>();

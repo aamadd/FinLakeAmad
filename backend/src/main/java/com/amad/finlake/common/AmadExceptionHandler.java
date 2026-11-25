@@ -5,6 +5,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.time.Instant;
 import java.util.Map;
@@ -13,8 +14,8 @@ import java.util.NoSuchElementException;
 @RestControllerAdvice
 public class AmadExceptionHandler {
 
-    @ExceptionHandler(NoSuchElementException.class)
-    public ResponseEntity<Map<String, Object>> handleNotFound(NoSuchElementException ex) {
+    @ExceptionHandler({NoSuchElementException.class, NoResourceFoundException.class})
+    public ResponseEntity<Map<String, Object>> handleNotFound(Exception ex) {
         return error(HttpStatus.NOT_FOUND, "NOT_FOUND", ex.getMessage());
     }
 
