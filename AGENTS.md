@@ -17,6 +17,17 @@ Source of truth: `docs/CAHIER_DES_CHARGES.md`. Naming not defined by the cahier 
 
 ## Code principles
 - SOLID: one module per feature (sources, ingestion, storage, catalog, jobs); depend on interfaces
-  (e.g. `SourceConnector`, `ObjectStore`, `FileWriter`, `CatalogRegistrar`) so SQL Server/PostgreSQL and
+  (e.g. `AmadSourceConnector`, `AmadObjectStore`, `AmadFileWriter`, `AmadCatalogRegistrar`) so SQL Server/PostgreSQL and
   CSV/Parquet are interchangeable implementations.
 - DRY: shared config, naming and error handling live in one `common` module; no copy-pasted per-source logic.
+
+## Skill routing
+- Stack & Compose: `.agents/skills/amad-stack-topology/SKILL.md`
+- Dataset & schema: `.agents/skills/amad-paysim-schema/SKILL.md`
+- Relational extraction: `.agents/skills/amad-relational-extract/SKILL.md`
+- Parquet & MinIO: `.agents/skills/amad-lake-storage/SKILL.md`
+- Trino & Hive catalog: `.agents/skills/amad-sql-catalog/SKILL.md`
+- Control plane & jobs: `.agents/skills/amad-control-jobs/SKILL.md`
+- Benchmarks: `.agents/skills/amad-perf-benchmarks/SKILL.md`
+- Quality & tests: `.agents/skills/amad-quality-checks/SKILL.md`
+- Docs & release: `.agents/skills/amad-docs-release/SKILL.md`
