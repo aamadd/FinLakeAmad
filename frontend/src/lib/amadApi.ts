@@ -72,6 +72,40 @@ export interface QueryResponse {
   durationMs: number;
 }
 
+export interface IcebergRegisterResponse {
+  catalog: string;
+  schema: string;
+  table: string;
+  location: string;
+  partitionedByEventDate: boolean;
+  rowCount: number;
+}
+
+export interface IcebergIngestResponse {
+  catalog: string;
+  schema: string;
+  table: string;
+  insertedRows: number;
+  totalRows: number;
+  latestSnapshotId: string | null;
+}
+
+export interface IcebergSnapshot {
+  snapshotId: string;
+  committedAt: string;
+  operation: string;
+  summary: string;
+}
+
+export interface IcebergSchemaEvolutionResponse {
+  catalog: string;
+  schema: string;
+  table: string;
+  addedColumn: string;
+  columnType: string;
+  columns: string[];
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${AMAD_API_URL}${path}`, {
     ...init,
@@ -107,4 +141,31 @@ export const amadApi = {
     request<Record<string, unknown>>("/catalog/register", { method: "POST", body: JSON.stringify(body) }),
   queryTrino: (sql: string, limit = 100) =>
     request<QueryResponse>("/catalog/query", { method: "POST", body: JSON.stringify({ sql, limit }) }),
+  registerIceberg: (body: { schema?: string; table: string; location?: string; partitionedByEventDate: boolean }) =>
+    request<IcebergRegisterResponse>("/catalog/iceberg/register", { method: "POST", body: JSON.stringify(body) }),
+  ingestIceberg: (body: {
+    sourceSchema?: string;
+    sourceTable?: string;
+    targetSchema?: string;
+    targetTable?: string;
+    minIngestRowId?: number | null;
+    maxIngestRowId?: number | null;
+  }) => request<IcebergIngestResponse>("/catalog/iceberg/ingest", { method: "POST", body: JSON.stringify(body) }),
+  icebergSnapshots: (schema = "finlake_iceberg", table = "amad_transactions") =>
+    request<IcebergSnapshot[]>(
+      `/catalog/iceberg/snapshots?schema=${encodeURIComponent(schema)}&table=${encodeURIComponent(table)}`
+    ),
+  icebergTimeTravel: (body: {
+    schema?: string;
+    table?: string;
+    snapshotId?: string;
+    timestampIso?: string;
+    limit?: number;
+  }) => request<QueryResponse>("/catalog/iceberg/time-travel", { method: "POST", body: JSON.stringify(body) }),
+  evolveIcebergSchema: (body: {
+    schema?: string;
+    table?: string;
+    columnName: string;
+    columnType: string;
+  }) => request<IcebergSchemaEvolutionResponse>("/catalog/iceberg/evolve-schema", { method: "POST", body: JSON.stringify(body) }),
 };

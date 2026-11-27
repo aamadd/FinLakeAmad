@@ -18,9 +18,34 @@ public record ExtractionRequest(
         @Min(100) @Max(500_000) int batchSize,
         List<String> partitionBy,
         String destinationPrefix,
-        long maxRows
+        long maxRows,
+        String watermarkColumn,
+        Long watermarkValue,
+        Boolean idempotent
 ) {
+    public ExtractionRequest(
+            String sourceId,
+            String schema,
+            String table,
+            StorageFormat format,
+            CompressionCodec compression,
+            int batchSize,
+            List<String> partitionBy,
+            String destinationPrefix,
+            long maxRows
+    ) {
+        this(sourceId, schema, table, format, compression, batchSize, partitionBy, destinationPrefix, maxRows, null, null, null);
+    }
+
     public List<String> normalizedPartitions() {
         return partitionBy == null ? List.of() : partitionBy;
+    }
+
+    public String effectiveWatermarkColumn() {
+        return (watermarkColumn == null || watermarkColumn.isBlank()) ? "ingest_row_id" : watermarkColumn.trim();
+    }
+
+    public boolean isIdempotent() {
+        return Boolean.TRUE.equals(idempotent);
     }
 }

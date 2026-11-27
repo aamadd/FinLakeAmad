@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, Box, ChevronDown, Database, Layers, ListTree } from "lucide-react";
+import { Activity, Box, ChevronDown, Database, GitBranch, Layers, ListTree } from "lucide-react";
 import type { ReactNode } from "react";
 
 const NAV_ITEMS = [
@@ -34,12 +34,21 @@ export function AmadShell({ children }: { children: ReactNode }) {
     if (pathname === "/jobs") {
       return <span className="text-xs font-semibold text-neutral-900">Storage Jobs</span>;
     }
+    if (pathname === "/iceberg") {
+      return (
+        <div className="flex items-center gap-2 text-xs text-neutral-500">
+          <span>Bonus</span>
+          <span>›</span>
+          <span className="font-semibold text-neutral-900">Apache Iceberg</span>
+        </div>
+      );
+    }
     return <span className="text-xs font-semibold text-neutral-900">Data Platform</span>;
   };
 
   return (
     <div className="min-h-screen bg-white flex font-sans text-neutral-900">
-      {/* Wireframe Left Sidebar (#f5f5f5) — exact 4 items */}
+      {/* Wireframe Left Sidebar (#f5f5f5) — 4 core items + Bonus */}
       <aside className="w-56 bg-[#f5f5f5] border-r border-neutral-200 flex flex-col fixed inset-y-0 left-0 z-30">
         <div className="h-14 flex items-center gap-2.5 px-4">
           <div className="h-7 w-7 bg-[#27272a] rounded-md flex items-center justify-center text-white">
@@ -82,6 +91,23 @@ export function AmadShell({ children }: { children: ReactNode }) {
               </Link>
             );
           })}
+
+          <div className="pt-4 mt-4 border-t border-neutral-200">
+            <div className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-neutral-400">
+              Bonus
+            </div>
+            <Link
+              href="/iceberg"
+              className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-xs transition ${
+                pathname === "/iceberg"
+                  ? "bg-white border border-neutral-300 text-neutral-900 font-semibold shadow-2xs"
+                  : "text-neutral-600 hover:text-neutral-900 hover:bg-neutral-200/60 font-medium"
+              }`}
+            >
+              <GitBranch className={`h-4 w-4 ${pathname === "/iceberg" ? "text-neutral-900" : "text-neutral-500"}`} />
+              <span>Iceberg</span>
+            </Link>
+          </div>
         </nav>
       </aside>
 
