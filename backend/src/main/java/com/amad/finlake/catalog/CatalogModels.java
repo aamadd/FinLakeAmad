@@ -37,4 +37,53 @@ public final class CatalogModels {
             int rowCount,
             long durationMs
     ) {}
+
+    public record IcebergIngestRequest(
+            String sourceSchema,
+            String sourceTable,
+            String targetSchema,
+            String targetTable,
+            Long minIngestRowId,
+            Long maxIngestRowId
+    ) {}
+
+    public record IcebergIngestResponse(
+            String catalog,
+            String schema,
+            String table,
+            long insertedRows,
+            long totalRows,
+            String latestSnapshotId
+    ) {}
+
+    public record IcebergSnapshot(
+            String snapshotId,
+            String committedAt,
+            String operation,
+            String summary
+    ) {}
+
+    public record IcebergSchemaEvolutionRequest(
+            String schema,
+            String table,
+            @NotBlank String columnName,
+            @NotBlank String columnType
+    ) {}
+
+    public record IcebergSchemaEvolutionResponse(
+            String catalog,
+            String schema,
+            String table,
+            String addedColumn,
+            String columnType,
+            List<String> columns
+    ) {}
+
+    public record IcebergTimeTravelRequest(
+            String schema,
+            String table,
+            String snapshotId,
+            String timestampIso,
+            @Min(1) @Max(1000) Integer limit
+    ) {}
 }

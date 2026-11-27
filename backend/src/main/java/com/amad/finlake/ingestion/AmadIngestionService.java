@@ -58,6 +58,7 @@ public class AmadIngestionService {
             ProgressListener progress
     ) throws Exception {
         validatePartitions(req.normalizedPartitions());
+        String watermarkCol = KeysetBatchReader.validateWatermarkColumn(req.effectiveWatermarkColumn());
         SourceConfig cfg = sources.getConfig(req.sourceId());
         AmadSourceConnector connector = sources.getConnector(cfg.engine());
         AmadFileWriter writer = writers.get(req.format());
@@ -67,38 +68,53 @@ public class AmadIngestionService {
 
         String schema = (req.schema() == null || req.schema().isBlank()) ? connector.defaultSchema() : req.schema();
         String runId = UUID.randomUUID().toString();
-        String zone = (req.destinationPrefix() == null || req.destinationPrefix().isBlank())
-                ? "curated"
+        String requestedZone = (req.destinationPrefix() == null || req.destinationPrefix().isBlank())
+                ? (req.format() == StorageFormat.CSV ? "raw" : "curated")
                 : req.destinationPrefix().replaceAll("^/+|/+$", "");
+        final String zone = (req.format() == StorageFormat.CSV && "curated".equalsIgnoreCase(requestedZone))
+                ? "raw"
+                : requestedZone;
         boolean partitionByDate = req.normalizedPartitions().contains("event_date");
         String ingestDate = LocalDate.now(ZoneOffset.UTC).toString();
 
         List<StagedObject> staged = new ArrayList<>();
         AtomicInteger partSeq = new AtomicInteger(0);
         AtomicLong totalBytes = new AtomicLong(0);
+        AtomicLong maxWatermark = new AtomicLong(req.watermarkValue() == null ? 0L : req.watermarkValue());
         Path tmpDir = Files.createTempDirectory("amad_ingest_" + runId + "_");
 
         try {
-            long rowsRead = reader.streamBatches(cfg, connector, schema, req.table(), req.batchSize(), req.maxRows(), cancelled, batch -> {
-                if (partitionByDate) {
-                    Map<LocalDate, List<TransactionRow>> byDate = batch.stream()
-                            .collect(Collectors.groupingBy(TransactionRow::eventDate));
-                    for (var entry : byDate.entrySet()) {
-                        String relPath = "event_date=" + entry.getKey() + "/part-" + String.format("%05d", partSeq.incrementAndGet()) + writer.fileExtension();
-                        staged.add(stageFile(tmpDir, runId, zone, req, relPath, entry.getValue(), writer, totalBytes));
-                    }
-                } else {
-                    String relPath = "part-" + String.format("%05d", partSeq.incrementAndGet()) + writer.fileExtension();
-                    staged.add(stageFile(tmpDir, runId, zone, req, relPath, batch, writer, totalBytes));
-                }
-                if (progress != null) {
-                    progress.onBatch(batch.size(), staged.size(), totalBytes.get());
-                }
-            });
+            long rowsRead = reader.streamBatches(
+                    cfg, connector, schema, req.table(), req.batchSize(), req.maxRows(),
+                    watermarkCol, req.watermarkValue(), cancelled, batch -> {
+                        long batchMax = "step".equals(watermarkCol)
+                                ? batch.stream().mapToLong(TransactionRow::step).max().orElse(0L)
+                                : batch.stream().mapToLong(TransactionRow::ingestRowId).max().orElse(0L);
+                        maxWatermark.accumulateAndGet(batchMax, Math::max);
+
+                        if (partitionByDate) {
+                            Map<LocalDate, List<TransactionRow>> byDate = batch.stream()
+                                    .collect(Collectors.groupingBy(TransactionRow::eventDate));
+                            for (var entry : byDate.entrySet()) {
+                                String relPath = "event_date=" + entry.getKey() + "/part-" + String.format("%05d", partSeq.incrementAndGet()) + writer.fileExtension();
+                                staged.add(stageFile(tmpDir, runId, zone, req, relPath, entry.getValue(), writer, totalBytes));
+                            }
+                        } else {
+                            String relPath = "part-" + String.format("%05d", partSeq.incrementAndGet()) + writer.fileExtension();
+                            staged.add(stageFile(tmpDir, runId, zone, req, relPath, batch, writer, totalBytes));
+                        }
+                        if (progress != null) {
+                            progress.onBatch(batch.size(), staged.size(), totalBytes.get());
+                        }
+                    });
 
             if (cancelled.getAsBoolean()) {
-                cleanupStaging(staged);
                 throw new InterruptedException("Extraction cancelled");
+            }
+
+            if (req.isIdempotent() && req.watermarkValue() == null && !"raw".equals(zone)) {
+                String targetPrefix = String.format("%s/paysim/%s/", zone, req.table());
+                deletePrefix(targetPrefix);
             }
 
             List<ObjectEntry> promoted = new ArrayList<>(staged.size());
@@ -109,19 +125,37 @@ public class AmadIngestionService {
                 objectStore.copyObject(s.stagingKey, targetKey);
                 promoted.add(new ObjectEntry(targetKey, s.bytes, s.sha256));
             }
-            cleanupStaging(staged);
 
+            Long watermarkEnd = rowsRead > 0 ? maxWatermark.get() : req.watermarkValue();
             AmadManifest manifest = new AmadManifest(
                     runId, jobId, req.sourceId(), schema, req.table(), req.format(), req.compression(),
                     req.normalizedPartitions(), rowsRead, totalBytes.get(), promoted,
-                    timeMapper.epoch().toString(), Instant.now()
+                    timeMapper.epoch().toString(), Instant.now(),
+                    watermarkCol, req.watermarkValue(), watermarkEnd
             );
             String manifestKey = String.format("manifests/paysim/%s/%s.json", req.table(), runId);
             objectStore.putJson(manifestKey, manifest);
             return manifest;
         } finally {
+            cleanupStaging(staged);
             deleteDirectoryQuietly(tmpDir);
         }
+    }
+
+    public int cleanupOrphanedStaging() {
+        return deletePrefix("staging/");
+    }
+
+    private int deletePrefix(String prefix) {
+        List<String> keys = objectStore.listKeys(prefix);
+        int deleted = 0;
+        for (String key : keys) {
+            try {
+                objectStore.deleteObject(key);
+                deleted++;
+            } catch (Exception ignored) {}
+        }
+        return deleted;
     }
 
     private StagedObject stageFile(

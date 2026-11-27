@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""FinLakeAmad Phase 6 — Reproducible storage, partitioning, compression, and Trino query benchmarks."""
+"""FinLakeAmad Phase 6 & P7 Bonus — Reproducible storage, partitioning, compression, Hive vs Iceberg, and Trino query benchmarks."""
 from __future__ import annotations
 
 import argparse
 import csv
+import http.client
 import json
 import os
 import platform
@@ -12,7 +13,7 @@ import subprocess
 import time
 import urllib.error
 import urllib.request
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -37,12 +38,18 @@ class ExperimentSpec:
 def api_request(base_url: str, method: str, path: str, body: dict | None = None) -> dict:
     data = json.dumps(body).encode("utf-8") if body is not None else None
     headers = {"Content-Type": "application/json"} if body is not None else {}
-    req = urllib.request.Request(f"{base_url}{path}", data=data, headers=headers, method=method)
-    try:
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            return json.loads(resp.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        raise RuntimeError(f"HTTP {exc.code} on {method} {path}: {exc.read().decode(errors='replace')}") from exc
+    for attempt in range(4):
+        req = urllib.request.Request(f"{base_url}{path}", data=data, headers=headers, method=method)
+        try:
+            with urllib.request.urlopen(req, timeout=180) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            raise RuntimeError(f"HTTP {exc.code} on {method} {path}: {exc.read().decode(errors='replace')}") from exc
+        except (ConnectionResetError, urllib.error.URLError, TimeoutError, http.client.HTTPException):
+            if attempt == 3:
+                raise
+            time.sleep(1.0)
+    raise RuntimeError(f"Unreachable retry loop on {method} {path}")
 
 
 def run_job(base_url: str, spec: ExperimentSpec, max_rows: int) -> tuple[dict, float]:
@@ -57,6 +64,7 @@ def run_job(base_url: str, spec: ExperimentSpec, max_rows: int) -> tuple[dict, f
         "partitionBy": spec.partition_by,
         "destinationPrefix": spec.destination_prefix,
         "maxRows": max_rows,
+        "idempotent": True,
     })
     job_id = job["jobId"]
     while True:
@@ -65,13 +73,13 @@ def run_job(base_url: str, spec: ExperimentSpec, max_rows: int) -> tuple[dict, f
             break
         if status["status"] in ("FAILED", "CANCELLED"):
             raise RuntimeError(f"Job {job_id} ended with {status['status']}: {status.get('errorMessage')}")
-        time.sleep(0.5)
+        time.sleep(1.0)
     elapsed = time.perf_counter() - t0
     manifest = api_request(base_url, "GET", f"/storage/jobs/{job_id}/result")
     return manifest, elapsed
 
 
-def benchmark_trino(base_url: str, full_table: str, trials: int) -> dict[str, dict[str, float]]:
+def benchmark_trino(base_url: str, full_table: str, trials: int, query_endpoint: str = "/catalog/query") -> dict[str, dict[str, float]]:
     queries = {
         "full_count": f"SELECT COUNT(*) FROM {full_table}",
         "time_filter": f"SELECT COUNT(*) FROM {full_table} WHERE event_date = '2026-01-01' AND amount > 10000",
@@ -79,12 +87,11 @@ def benchmark_trino(base_url: str, full_table: str, trials: int) -> dict[str, di
     }
     stats: dict[str, dict[str, float]] = {}
     for qname, sql in queries.items():
-        # Warm-up (not recorded in median)
-        api_request(base_url, "POST", "/catalog/query", {"sql": sql, "limit": 100})
+        api_request(base_url, "POST", query_endpoint, {"sql": sql, "limit": 100})
         latencies_ms: list[float] = []
         for _ in range(trials):
             t0 = time.perf_counter()
-            api_request(base_url, "POST", "/catalog/query", {"sql": sql, "limit": 100})
+            api_request(base_url, "POST", query_endpoint, {"sql": sql, "limit": 100})
             latencies_ms.append((time.perf_counter() - t0) * 1000.0)
         stats[qname] = {
             "median_ms": round(statistics.median(latencies_ms), 2),
@@ -92,6 +99,47 @@ def benchmark_trino(base_url: str, full_table: str, trials: int) -> dict[str, di
             "max_ms": round(max(latencies_ms), 2),
         }
     return stats
+
+
+def run_iceberg_experiment(base_url: str, max_rows: int, trials: int, base_hive_row: dict) -> dict:
+    iceberg_table = f"amad_transactions_bench_{int(time.time())}"
+    t0 = time.perf_counter()
+    api_request(base_url, "POST", "/catalog/iceberg/register", {
+        "schema": "finlake_iceberg",
+        "table": iceberg_table,
+        "location": f"s3a://amad-lake/iceberg/{iceberg_table}/",
+        "partitionedByEventDate": True,
+    })
+    ingest_resp = api_request(base_url, "POST", "/catalog/iceberg/ingest", {
+        "sourceSchema": "finlake_bench_mssql_pq_zstd_part_b10k",
+        "sourceTable": "amad_transactions",
+        "targetSchema": "finlake_iceberg",
+        "targetTable": iceberg_table,
+        "minIngestRowId": 0,
+        "maxIngestRowId": max_rows,
+    })
+    iceberg_write_s = time.perf_counter() - t0
+    qstats = benchmark_trino(
+        base_url,
+        f"amad_iceberg.finlake_iceberg.{iceberg_table}",
+        trials,
+        query_endpoint="/catalog/iceberg/query",
+    )
+    return {
+        "name": "mssql-iceberg-zstd-part",
+        "source_id": "amad-mssql (via Hive Parquet)",
+        "format": "ICEBERG_PARQUET",
+        "compression": "ZSTD",
+        "partition_by": ["event_date"],
+        "batch_size": base_hive_row["batch_size"],
+        "rows": ingest_resp["totalRows"],
+        "ingest_seconds": round(iceberg_write_s, 3),
+        "object_count": base_hive_row["object_count"],
+        "total_bytes": base_hive_row["total_bytes"],
+        "trino_count_median_ms": qstats["full_count"]["median_ms"],
+        "trino_filter_median_ms": qstats["time_filter"]["median_ms"],
+        "trino_agg_median_ms": qstats["type_fraud_agg"]["median_ms"],
+    }
 
 
 def collect_environment() -> dict:
@@ -135,6 +183,24 @@ def write_report(env: dict, rows: list[dict], max_rows: int, trials: int) -> Non
             f"{r['batch_size']} | {r['ingest_seconds']:.2f} | {r['object_count']} | {r['total_bytes']:,} | {avg_kb} | "
             f"{r['trino_count_median_ms'] or '-'} | {r['trino_filter_median_ms'] or '-'} | {r['trino_agg_median_ms'] or '-'} |"
         )
+
+    hive_row = next((r for r in rows if r["name"] == "mssql-pq-zstd-part-b10k"), None)
+    iceberg_row = next((r for r in rows if r["name"] == "mssql-iceberg-zstd-part"), None)
+    if hive_row and iceberg_row:
+        lines += [
+            "",
+            "## Hive External Parquet vs Apache Iceberg",
+            "",
+            "| Criterion | Hive External Parquet (`amad_lake`) | Apache Iceberg (`amad_iceberg`) |",
+            "|---|---|---|",
+            f"| `SELECT COUNT(*)` median (ms) | {hive_row['trino_count_median_ms']} | {iceberg_row['trino_count_median_ms']} |",
+            f"| Time-filter median (ms) | {hive_row['trino_filter_median_ms']} | {iceberg_row['trino_filter_median_ms']} |",
+            f"| Type/Fraud aggregation median (ms) | {hive_row['trino_agg_median_ms']} | {iceberg_row['trino_agg_median_ms']} |",
+            "| ACID & Snapshot Isolation | No (`sync_partition_metadata` required) | Yes (atomic snapshot commits) |",
+            "| Schema Evolution (`ADD COLUMN`) | Manual external DDL coordination | Native metadata-only evolution |",
+            "| Time Travel (`FOR VERSION/TIMESTAMP AS OF`) | Not supported | Native via Iceberg snapshots |",
+        ]
+
     lines += [
         "",
         "## Reproduction Command",
@@ -198,6 +264,11 @@ def main() -> int:
             row["trino_agg_median_ms"] = qstats["type_fraud_agg"]["median_ms"]
         print(f"[OK] {spec.name}: ingest={row['ingest_seconds']}s bytes={row['total_bytes']} trino_agg={row['trino_agg_median_ms']}ms")
         records.append(row)
+
+    base_hive_row = next(r for r in records if r["name"] == "mssql-pq-zstd-part-b10k")
+    iceberg_row = run_iceberg_experiment(args.api, args.max_rows, args.trials, base_hive_row)
+    print(f"[OK] {iceberg_row['name']}: write={iceberg_row['ingest_seconds']}s trino_agg={iceberg_row['trino_agg_median_ms']}ms")
+    records.append(iceberg_row)
 
     json_path = RESULTS_DIR / "amad_benchmark_results.json"
     csv_path = RESULTS_DIR / "amad_benchmark_results.csv"

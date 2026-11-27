@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -22,5 +23,11 @@ public class AmadIngestionController {
     @PostMapping("/extract")
     public AmadManifest extractSync(@Valid @RequestBody ExtractionRequest request) throws Exception {
         return ingestionService.execute("sync-" + UUID.randomUUID(), request, () -> false, null);
+    }
+
+    @PostMapping("/cleanup-staging")
+    public Map<String, Integer> cleanupStaging() {
+        int deleted = ingestionService.cleanupOrphanedStaging();
+        return Map.of("deletedObjects", deleted);
     }
 }

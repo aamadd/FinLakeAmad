@@ -1,4 +1,4 @@
-# Phase 0 acceptance check: every FinLakeAmad infrastructure service is healthy and reachable.
+# Phase 0 & P7 acceptance check: every FinLakeAmad infrastructure service is healthy and reachable.
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 $failed = 0
@@ -18,11 +18,11 @@ Check 'amad-minio-init completed' {
     $code = docker inspect -f '{{.State.ExitCode}}' amad-minio-init
     if ($code -ne '0') { throw "exit=$code" }
 }
-Check 'Trino sees catalog amad_lake' {
+Check 'Trino sees catalog amad_lake and amad_iceberg' {
     $prev = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
     $out = (docker exec -e TERM=dumb amad-trino trino --execute 'SHOW CATALOGS' 2>&1) -join "`n"
     $code = $LASTEXITCODE; $ErrorActionPreference = $prev
-    if ($code -ne 0 -or $out -notmatch 'amad_lake') { throw "code=$code catalogs: $out" }
+    if ($code -ne 0 -or $out -notmatch 'amad_lake' -or $out -notmatch 'amad_iceberg') { throw "code=$code catalogs: $out" }
 }
 Check 'Trino -> Metastore round trip (SHOW SCHEMAS)' {
     $prev = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
@@ -31,4 +31,4 @@ Check 'Trino -> Metastore round trip (SHOW SCHEMAS)' {
     if ($code -ne 0 -or $out -notmatch 'default') { throw "code=$code out: $out" }
 }
 
-if ($failed) { Write-Host "$failed check(s) failed"; exit 1 } else { Write-Host 'Phase 0 infrastructure OK' }
+if ($failed) { Write-Host "$failed check(s) failed"; exit 1 } else { Write-Host 'Infrastructure OK (Hive + Iceberg catalogs ready)' }

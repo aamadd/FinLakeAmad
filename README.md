@@ -19,6 +19,7 @@ PaySim CSV -> SQL Server / PostgreSQL -> amad-control-plane (Spring Boot 3.3.5, 
 | 5 | Jobs API (`/storage/jobs`), states, retry, cancel | done |
 | 6 | Benchmarks + report | done |
 | 7 | `amad-console` UI (optional per cahier §2.2) | done |
+| P7 Bonus | Apache Iceberg (`amad_iceberg`), incremental watermark, `/iceberg` UI, Hive vs Iceberg benchmark & §14 docs | done |
 
 ## Quick start (Phase 0)
 ```powershell
