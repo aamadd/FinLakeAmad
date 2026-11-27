@@ -29,7 +29,7 @@ export default function JobsPage() {
       compression,
       batchSize: 10000,
       partitionBy: ["event_date"],
-      destinationPrefix: "curated",
+      destinationPrefix: format === "CSV" ? "raw" : "curated",
       maxRows,
     });
     load();
